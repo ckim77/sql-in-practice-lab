@@ -1,9 +1,52 @@
+require("dotenv").config();
+const {CONNECTION_STRING} = process.env; // descstructured process.env.CONNECTION_STRING
+const Sequelize = require("sequelize");
+
+const sequelize = new Sequelize(CONNECTION_STRING, {
+    dialect: "postgres",
+    dialectOptions: {
+        ssl: {
+            rejectUnauthorized: false
+        }
+    } 
+})
+
 let nextEmp = 5
 
 module.exports = {
+    getAllClients: (req, res) => {
+        sequelize.query(`select * from cc_clients as c
+        join cc_users as u on c.user_id = u.user_id`)
+            .then (dbRes => {
+                console.log(dbRes);
+                res.status(200).send(dbRes[0]);
+            })
+            .catch (err => console.log(err));
+    },
+    
+    getPendingAppointments: (req, res) => {
+        sequelize.query(`select * from cc_appointments where approved=false
+        order by date`)
+            .then (dbRes => {
+                res.status(200).send(dbRes[0])
+            })
+            .catch (err => console.log(err));
+    },
+
+    getPastAppointments: (req, res) => {
+        sequelize.query(`select a.appt_id, a.date, a.service_type, a.notes, u.first_name, u.last_name FROM cc_appointments as a
+        join cc_users as u 
+        on a.client_id = u.user_id
+        order by a.date DESC`)
+            .then (dbRes => {
+                res.status(200).send(dbRes[0])
+            })
+            .catch (err => console.log(err));
+    },
+
     getUpcomingAppointments: (req, res) => {
         sequelize.query(`select a.appt_id, a.date, a.service_type, a.approved, a.completed, u.first_name, u.last_name 
-        from cc_appointments a
+        from cc_appointments as a
         join cc_emp_appts ea on a.appt_id = ea.appt_id
         join cc_employees e on e.emp_id = ea.emp_id
         join cc_users u on e.user_id = u.user_id
@@ -16,8 +59,9 @@ module.exports = {
     approveAppointment: (req, res) => {
         let {apptId} = req.body
     
-        sequelize.query(`*****YOUR CODE HERE*****
-        
+        sequelize.query(`update cc_appointments as a
+        set a.approved = true
+        where a.appt_id = apptId
         insert into cc_emp_appts (emp_id, appt_id)
         values (${nextEmp}, ${apptId}),
         (${nextEmp + 1}, ${apptId});
@@ -27,5 +71,15 @@ module.exports = {
                 nextEmp += 2
             })
             .catch(err => console.log(err))
+    },
+
+    completeAppointment: (req, res) => {
+        sequelize.query(`update cc_appointments as a
+        set a.completed = true
+        where a.appt_id = req.body.apptId`)
+            .then (dbRes => {
+                res.status(200).send(dbRes[0])
+            })
+            .catch (err => console.log(err))
     }
 }
